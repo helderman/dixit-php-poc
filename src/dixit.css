@@ -1,0 +1,27 @@
+h1 {
+	background: #06f;
+	color: #dff;
+	padding: 8px;
+}
+
+.players {
+	display: flex;
+	flex-wrap: wrap;
+}
+
+.player {
+	flex-shrink: 0;
+	margin: 4px;
+	width: 400px;
+	height: 600px;
+	border: thin solid grey;
+}
+
+.player h2 {
+	background: linear-gradient(white, #eef);
+	text-align: center;
+}
+
+.player div {
+	padding: 4px;
+}
