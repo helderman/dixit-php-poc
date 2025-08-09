@@ -9,11 +9,12 @@ $mysqli->query("SET ROLE 'dixit';");
 // ---------------------------------------------------------------------------
 // Log in
 // ---------------------------------------------------------------------------
-$user = $_SERVER['PHP_AUTH_USER'] ?? null;
-if ($user) {
-	$hash = hash('sha256', $_SERVER['PHP_AUTH_PW']);
+$user = null;
+$username = $_SERVER['PHP_AUTH_USER'] ?? null;
+if ($username) {
+	$pwd_hash = hash('sha256', $_SERVER['PHP_AUTH_PW']);
 	$stmt = $mysqli->prepare("SELECT Id, FullName FROM DixitUser WHERE UserName = ? AND HashedPassword = ?");
-	$stmt->bind_param("ss", $user, $hash);
+	$stmt->bind_param("ss", $username, $pwd_hash);
 	$stmt->execute();
 	$result = $stmt->get_result();
 	$user = $result->fetch_object();
@@ -47,13 +48,16 @@ if ($action) {
 	case 'newgame':
 		$gameName = filter_input(INPUT_POST, 'name');
 		if ($gameName) {
-			$stmt = $mysqli->prepare("INSERT INTO DixitGame (Name) VALUES (?)");
-			$stmt->bind_param("s", $gameName);
+			$stmt = $mysqli->prepare("CALL DixitCreateGame(?, ?, ?)");
+			$stmt->bind_param("sss", $username, $pwd_hash, $gameName);
 			$stmt->execute();
-			$players = array(2, 3, 4, 5);
-			foreach ($players as $userId) {
-				$stmt = $mysqli->prepare("INSERT INTO DixitPlayer (GameId, UserId) VALUES (?, ?)");
-				$stmt->bind_param("ii", $gameId, $userId);
+			$gameId = $mysqli->insert_id;
+			$stmt = $mysqli->prepare("CALL DixitCreateDeck(?)");
+			$stmt->bind_param("i", $gameId);
+			$stmt->execute();
+			if (isset($_POST['join'])) {
+				$stmt = $mysqli->prepare("CALL DixitJoinGame(?, ?, ?)");
+				$stmt->bind_param("ssi", $username, $pwd_hash, $gameId);
 				$stmt->execute();
 			}
 		}
@@ -76,9 +80,10 @@ if ($gameId === false || $gameId === null) {
 <title>Dixit</title>
 <link rel="stylesheet" href="dixit.css" />
 <h1>Dixit - Lobby</h1>
+<h2>Kies een spel</h2>
 <ul>
 <?php
-$stmt = $mysqli->prepare("SELECT Id, Name FROM DixitGame ORDER BY Id DESC");
+$stmt = $mysqli->prepare("SELECT Id, Name FROM DixitGame ORDER BY Id");
 $stmt->execute();
 $stmt->bind_result($gameId, $gameName);
 while ($stmt->fetch()) {
@@ -86,11 +91,20 @@ while ($stmt->fetch()) {
 }
 ?>
 </ul>
-<h2>Een nieuw spel aanmaken</h2>
+<h2>Begin een nieuw spel</h2>
 <form action="?action=newgame" method="post">
+<p>
 Geef het spel een naam:
-<input type="text" name="name" required />
-<input type="submit" value="Aanmaken" />
+<input type="text" name="name" required><br>
+</p>
+<p>
+Direct jezelf toevoegen als speler:
+<input type="checkbox" name="join" checked><br>
+</p>
+<p>
+Bevestig je keuzes:
+<input type="submit" value="OK">
+</p>
 </form>
 <?php
 	exit();

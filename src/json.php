@@ -19,8 +19,8 @@ if ($gameId === false || $gameId === null) {
 	http_response_code(400);
 	exit();
 }
-$stmt = $mysqli->prepare("CALL dixit.DixitHandsJson(?, ?, ?);");
-$stmt->bind_param("iss", $gameId, $username, $pwd_hash);
+$stmt = $mysqli->prepare("CALL DixitHandsJson(?, ?, ?);");
+$stmt->bind_param("ssi", $username, $pwd_hash, $gameId);
 $stmt->execute();
 $result = $stmt->get_result();
 $game = $result->fetch_object();
