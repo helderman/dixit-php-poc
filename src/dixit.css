@@ -4,7 +4,7 @@ h1 {
 	padding: 8px;
 }
 
-.players {
+#players {
 	display: flex;
 	flex-wrap: wrap;
 }
@@ -12,24 +12,34 @@ h1 {
 .player {
 	flex-shrink: 0;
 	margin: 4px;
-	width: 400px;
+	width: 430px;
 	border: thin solid grey;
 }
 
-.player h2 {
+.player > h2 {
 	background: linear-gradient(white, #eef);
 	text-align: center;
 }
 
-.player div {
-	padding: 4px;
+.player > h2.me {
+	text-decoration: underline;
 }
 
-.player div img {
+.player > p {
+	margin: 20px;
+}
+
+.player > div {
+	margin: 4px;
+}
+
+.player > div > img {
 	padding: 2px;
+	width: 128px;
+	height: 160px;
 	border: medium solid transparent;
 }
 
-.player div img.picked {
+.player > div > img.picked {
 	border-color: aqua;
 }

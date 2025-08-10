@@ -128,25 +128,6 @@ if (!$game) {
 <link rel="stylesheet" href="dixit.css" />
 <h1>Dixit - <?= htmlspecialchars($game->Name) ?> - <?= htmlspecialchars($user->FullName) ?></h1>
 <p id="story"></p>
-<div class="players">
-<?php
-// ---------------------------------------------------------------------------
-// Game members
-// ---------------------------------------------------------------------------
-$stmt = $mysqli->prepare("SELECT u.Id, u.FullName FROM DixitPlayer p INNER JOIN DixitUser u ON u.Id = p.UserId WHERE p.GameId = ? ORDER BY p.SortKey");
-$stmt->bind_param("i", $gameId);
-$stmt->execute();
-$stmt->bind_result($playerId, $playerFullName);
-while ($stmt->fetch()) {
-?>
-<div class="player">
-<h2><?= htmlspecialchars($playerFullName) ?></h2>
-<div id="player<?= $playerId ?>">
-</div>
-</div>
-<?php
-}
-?>
-</div>
+<div id="players"></div>
 <script src="index.js"></script>
 <script>poll(<?= $gameId ?>);</script>
