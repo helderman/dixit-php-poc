@@ -34,21 +34,25 @@ CREATE TABLE DixitUser (
 
 #GRANT SELECT ON DixitUser TO 'dixit';
 
-INSERT INTO DixitUser (Id, UserName, HashedPassword, FullName) VALUES
-	(1, 'gast', 'aaac7fafa76910e7a042ae9f783c08cc516ea835ee3cffb7055421a25be67a21', 'Gast'),
-	(2, 'marja', 'b7f750c2c0a45ce9965691c8c8609184c8db4454b5deab9d8de5161ebdd786d0', 'Marja'),
-	(3, 'marco', '39ca1d9c2ea67847fe6adb6f7ff73560323a56ac182607f13adf4583a5ef00f9', 'Marco'),
-	(4, 'rene', '6fcf8bf65219de08e0fce65a7cdda568c1fdc04286551ca264fd13bcd8331955', 'Rene'),
-	(5, 'ruud', '10420dde4669ae7c675eaccc72bd4814cab0ad6b823cc384d8ce9b574bcf574e', 'Ruud');
+INSERT INTO DixitUser (UserName, HashedPassword, FullName) VALUES
+	('gast', 'aaac7fafa76910e7a042ae9f783c08cc516ea835ee3cffb7055421a25be67a21', 'Gast'),
+	('kees', 'a51c75213f877072d747efd372e729a8c348af908b12140aec373bee0c3032a7', 'Kees'),
+	('marco', '39ca1d9c2ea67847fe6adb6f7ff73560323a56ac182607f13adf4583a5ef00f9', 'Marco'),
+	('marja', 'b7f750c2c0a45ce9965691c8c8609184c8db4454b5deab9d8de5161ebdd786d0', 'Marja'),
+	('paul', '363eb4ba561085d02bd4e6c07aa9847c762e97409fbd8876ddd192c38b66d9a0', 'Paul'),
+	('rene', '6fcf8bf65219de08e0fce65a7cdda568c1fdc04286551ca264fd13bcd8331955', 'Rene'),
+	('ruud', '10420dde4669ae7c675eaccc72bd4814cab0ad6b823cc384d8ce9b574bcf574e', 'Ruud'),
+	('winfried', 'e3cf9835a6308421367bd4945127c8acd4594b2dda941b520c0fdc104179140d', 'Winfried'),
+	('wim', 'f4c62aeb63302d6b1dbd9864dbd36acd1182bed76585cb3b8eff506f85bc7e14', 'Wim');
 
 DROP TABLE IF EXISTS DixitGame;
 CREATE TABLE DixitGame (
 	Id int NOT NULL AUTO_INCREMENT PRIMARY KEY,
 	Name varchar(100) NOT NULL,
-	OwnerUserId int NOT NULL,
+	MgrUserId int NOT NULL,
 	StUserId int NULL,
 	Story varchar(255) NULL,
-	Status tinyint NOT NULL DEFAULT 0,	-- 0 = sit down, 1 = picking, 2 = voting, 3 = showdown
+	Status tinyint NOT NULL DEFAULT 0,	-- 0 = join, 1 = story, 2 = pick, 3 = vote, 4 = showdown
 	StatusSince TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 
@@ -60,6 +64,7 @@ CREATE TABLE DixitPlayer (
 	UserId int NOT NULL,
 	SortKey float NOT NULL,
 	Score int NOT NULL DEFAULT 0,
+	VoteCardId int NOT NULL DEFAULT 0,
 
 	UNIQUE ixGameUser (GameId, UserId),
 	UNIQUE ixSortKey (GameId, SortKey)
@@ -80,17 +85,6 @@ CREATE TABLE DixitGameCard (
 );
 
 #GRANT SELECT ON DixitGameCard TO 'dixit';
-
-DROP TABLE IF EXISTS DixitVote;
-CREATE TABLE DixitVote (
-	GameId int NOT NULL,
-	CardId int NOT NULL,
-	UserId int NULL,
-
-	UNIQUE ixGameUserCard (GameId, UserId, CardId)
-);
-
-#GRANT SELECT ON DixitVote TO 'dixit';
 
 -- Get user ID
 DROP PROCEDURE IF EXISTS DixitUserId;
@@ -118,6 +112,7 @@ DROP PROCEDURE IF EXISTS DixitJson;
 CREATE PROCEDURE DixitJson(p_gameId int, p_userId int)
 	SELECT JSON_OBJECT(
 		'StUserId', g.StUserId,
+		'IAmMgr', g.MgrUserId = p_userId,
 		'IAmSt', g.StUserId = p_userId,
 		'Story', g.Story,
 		'Status', g.Status,
@@ -140,23 +135,20 @@ CREATE PROCEDURE DixitJson(p_gameId int, p_userId int)
 					WHERE c.GameId = p.GameId
 					AND c.UserId = p.UserId
 				),
-				'Votes', (
-					SELECT JSON_ARRAYAGG(JSON_OBJECT(
-						'CardId', CASE WHEN v.UserId = p_userId OR g.Status > 1 THEN v.CardId END
-					))
-					FROM DixitVote v
-					WHERE v.GameId = p.GameId
-					AND v.UserId = p.UserId
-				)
+				'Vote', CASE WHEN p.UserId = p_userId OR p.VoteCardId = 0 THEN p.VoteCardId END
 			))
 			FROM DixitPlayer p
 			INNER JOIN DixitUser u ON u.Id = p.UserId
 			WHERE p.GameId = g.Id
 		),
 		'VotingCards', (
-			SELECT JSON_ARRAYAGG(JSON_OBJECT('Id', c.CardId, 'StPick', g.Status > 1 AND c.UserId = g.StUserId))
+			SELECT JSON_ARRAYAGG(JSON_OBJECT(
+				'Id', c.CardId,
+				'StPick', g.Status > 3 AND c.UserId = g.StUserId,
+				'SortKey', c.SortKey
+			))
 			FROM DixitGameCard c
-			WHERE g.Status > 0
+			WHERE g.Status > 1
 			AND c.GameId = g.Id
 			AND c.IsPicked
 		)
@@ -170,7 +162,7 @@ CREATE PROCEDURE DixitJson(p_gameId int, p_userId int)
 -- Note: in PHP, after calling this SP, $mysqli->insert_id holds game's Id
 DROP PROCEDURE IF EXISTS DixitCreateGame;
 CREATE PROCEDURE DixitCreateGame(p_userName varchar(100), p_hashedPassword varchar(64), p_name varchar(100))
-	INSERT INTO DixitGame (Name, OwnerUserId)
+	INSERT INTO DixitGame (Name, MgrUserId)
 	SELECT p_name, Id
 	FROM DixitUser
 	WHERE UserName = p_userName
@@ -187,7 +179,7 @@ CREATE PROCEDURE DixitCreateDeck(p_gameId int)
 
 #GRANT EXECUTE ON PROCEDURE DixitCreateDeck TO 'dixit';
 
--- Let owner add player to game
+-- Let manager add player to game
 -- Note: in PHP, after calling this SP, $mysqli->affected_rows is 1 (success) or 0
 DROP PROCEDURE IF EXISTS DixitAddPlayer;
 CREATE PROCEDURE DixitAddPlayer(p_userName varchar(100), p_hashedPassword varchar(64), p_gameId int, p_userId int)
@@ -195,11 +187,11 @@ CREATE PROCEDURE DixitAddPlayer(p_userName varchar(100), p_hashedPassword varcha
 	SELECT Id, p_userId, RAND()
 	FROM DixitGame
 	WHERE Id = p_gameId
-	AND OwnerUserId IN (SELECT Id FROM DixitUser WHERE UserName = p_userName AND HashedPassword = p_hashedPassword);
+	AND MgrUserId IN (SELECT Id FROM DixitUser WHERE UserName = p_userName AND HashedPassword = p_hashedPassword);
 
 #GRANT EXECUTE ON PROCEDURE DixitAddPlayer TO 'dixit';
 
--- Let owner remove player from game
+-- Let manager remove player from game
 -- Note: in PHP, after calling this SP, $mysqli->affected_rows is 1 (success) or 0
 DROP PROCEDURE IF EXISTS DixitRemovePlayer;
 CREATE PROCEDURE DixitRemovePlayer(p_userName varchar(100), p_hashedPassword varchar(64), p_gameId int, p_userId int)
@@ -207,7 +199,7 @@ CREATE PROCEDURE DixitRemovePlayer(p_userName varchar(100), p_hashedPassword var
 	WHERE GameId = p_gameId
 	AND UserId = p_userId
 	AND GameId IN (
-		SELECT Id FROM DixitGame WHERE OwnerUserId IN (
+		SELECT Id FROM DixitGame WHERE MgrUserId IN (
 			SELECT Id FROM DixitUser WHERE UserName = p_userName AND HashedPassword = p_hashedPassword
 		)
 	);
@@ -237,25 +229,15 @@ CREATE PROCEDURE DixitLeaveGame(p_userName varchar(100), p_hashedPassword varcha
 
 #GRANT EXECUTE ON PROCEDURE DixitLeaveGame TO 'dixit';
 
--- Start game
--- Note: in PHP, after calling this SP, $mysqli->affected_rows is 1 (success) or 0
-DROP PROCEDURE IF EXISTS DixitStartGame;
-CREATE PROCEDURE DixitStartGame(p_gameId int)
-	UPDATE DixitGame
-	SET Status = 1
-	WHERE Id = p_gameId
-	AND Status = 0
-	AND 4 = (SELECT COUNT(*) FROM DixitPlayer WHERE GameId = p_gameId);
-
-#GRANT EXECUTE ON PROCEDURE DixitStartGame TO 'dixit';
-
--- Draw card if less than 6 in hand
+-- Draw card(s) if less than 6 in hand
+-- Note: in PHP, after calling this SP, $mysqli->affected_rows < 6 means draw pile depleted
 DROP PROCEDURE IF EXISTS DixitDraw;
 CREATE PROCEDURE DixitDraw(p_gameId int, p_userId int)
 	UPDATE DixitGameCard
 	SET UserId = p_userId
-	WHERE GameId = p_gameId
+	WHERE GameId IN (SELECT Id FROM DixitGame WHERE Id = p_gameId AND Status = 1)
 	AND UserId IN (0, p_userId)
+	AND EXISTS (SELECT * FROM DixitPlayer WHERE GameId = p_gameId AND UserId = p_userId)
 	ORDER BY UserId DESC, SortKey
 	LIMIT 6;
 
@@ -279,64 +261,122 @@ CREATE PROCEDURE DixitShuffleDrawPile(p_gameId int)
 
 #GRANT EXECUTE ON PROCEDURE DixitShuffleDrawPile TO 'dixit';
 
--- Shuffle the players (give them random seats at the table).
-DROP PROCEDURE IF EXISTS DixitFirstTurn;
-CREATE PROCEDURE DixitFirstTurn(p_gameId int)
+-- Rotate the players so that the next one will become first in line; reset votes.
+DROP PROCEDURE IF EXISTS DixitRotatePlayers;
+CREATE PROCEDURE DixitRotatePlayers(p_userName varchar(100), p_hashedPassword varchar(64), p_gameId int)
 	UPDATE DixitPlayer
-	SET SortKey = RAND()
-	WHERE GameId = p_gameId;
-
-#GRANT EXECUTE ON PROCEDURE DixitFirstTurn TO 'dixit';
-
--- Rotate the players so that the next one will become first in line.
-DROP PROCEDURE IF EXISTS DixitNextTurn;
-CREATE PROCEDURE DixitNextTurn(p_userName varchar(100), p_hashedPassword varchar(64), p_gameId int)
-	UPDATE DixitPlayer
-	SET SortKey = SortKey + 1.0
+	SET SortKey = SortKey + 1.0, VoteCardId = 0
 	WHERE GameId = p_gameId
 	AND UserId IN (SELECT StUserId FROM DixitGame WHERE Id = p_gameId)
 	AND UserId IN (SELECT Id FROM DixitUser WHERE UserName = p_userName AND HashedPassword = p_hashedPassword);
 
-#GRANT EXECUTE ON PROCEDURE DixitNextTurn TO 'dixit';
+#GRANT EXECUTE ON PROCEDURE DixitRotatePlayers TO 'dixit';
 
 -- Make the player who is first in line the storyteller.
--- Call this SP after calling DixitFirstTurn or DixitNextTurn.
+-- Call this SP either after adding players or after calling DixitRotatePlayers.
 DROP PROCEDURE IF EXISTS DixitStartTurn;
-CREATE PROCEDURE DixitStartTurn(p_gameId int)
+CREATE PROCEDURE DixitStartTurn(p_userName varchar(100), p_hashedPassword varchar(64), p_gameId int)
 	UPDATE DixitGame
 	SET StUserId = (SELECT UserId FROM DixitPlayer WHERE GameId = p_gameId ORDER BY SortKey LIMIT 1),
 		Story = NULL,
-		Status = 0
-	WHERE Id = p_gameId;
+		Status = 1
+	WHERE Id = p_gameId
+	AND Status IN (0, 4)
+	AND 4 = (SELECT COUNT(*) FROM DixitPlayer WHERE GameId = p_gameId)
+	AND COALESCE(StUserId, MgrUserId) IN (SELECT Id FROM DixitUser WHERE UserName = p_userName AND HashedPassword = p_hashedPassword);
 
 #GRANT EXECUTE ON PROCEDURE DixitStartTurn TO 'dixit';
 
 -- Pick card (works both for storyteller and for voter)
+-- Note: in PHP, after calling this SP, $mysqli->affected_rows is 1 or 2 (success) or 0
 DROP PROCEDURE IF EXISTS DixitPickCard;
 CREATE PROCEDURE DixitPickCard(p_userName varchar(100), p_hashedPassword varchar(64), p_gameId int, p_cardId int)
 	UPDATE DixitGameCard
-	SET IsPicked = true
-	WHERE GameId = p_gameId
-	AND CardId = p_cardId
+	SET IsPicked = (CardId = p_cardId)
+	WHERE GameId IN (SELECT Id FROM DixitGame WHERE Id = p_gameId AND Status = CASE StUserId WHEN UserId THEN 1 ELSE 2 END)
 	AND UserId IN (SELECT Id FROM DixitUser WHERE UserName = p_userName AND HashedPassword = p_hashedPassword);
 
 #GRANT EXECUTE ON PROCEDURE DixitPickCard TO 'dixit';
 
 -- Post story (storyteller only).
 DROP PROCEDURE IF EXISTS DixitPostStory;
-CREATE PROCEDURE DixitPostStory(p_userName varchar(100), p_hashedPassword varchar(64), p_gameId int, p_cardId int, p_story varchar(255))
+CREATE PROCEDURE DixitPostStory(p_userName varchar(100), p_hashedPassword varchar(64), p_gameId int, p_story varchar(255))
 	UPDATE DixitGame
-	SET Story = p_story
+	SET Status = 2, Story = p_story
 	WHERE Id = p_gameId
+	AND Id IN (SELECT GameId FROM DixitGameCard WHERE UserId = stUserId)
+	AND Status = 1
 	AND StUserId IN (SELECT Id FROM DixitUser WHERE UserName = p_userName AND HashedPassword = p_hashedPassword);
 
 #GRANT EXECUTE ON PROCEDURE DixitPostStory TO 'dixit';
 
-CALL DixitCreateGame('rene', '6fcf8bf65219de08e0fce65a7cdda568c1fdc04286551ca264fd13bcd8331955', 'HCC test crew');
-CALL DixitCreateDeck(1);
-CALL DixitAddPlayer('rene', '6fcf8bf65219de08e0fce65a7cdda568c1fdc04286551ca264fd13bcd8331955', 1, 2);
-CALL DixitAddPlayer('rene', '6fcf8bf65219de08e0fce65a7cdda568c1fdc04286551ca264fd13bcd8331955', 1, 3);
-CALL DixitAddPlayer('rene', '6fcf8bf65219de08e0fce65a7cdda568c1fdc04286551ca264fd13bcd8331955', 1, 4);
-CALL DixitAddPlayer('rene', '6fcf8bf65219de08e0fce65a7cdda568c1fdc04286551ca264fd13bcd8331955', 1, 5);
+-- Shuffle voting cards
+-- TODO: allow only if every player picked a card
+DROP PROCEDURE IF EXISTS DixitShuffleVotingCards;
+CREATE PROCEDURE DixitShuffleVotingCards(p_userName varchar(100), p_hashedPassword varchar(64), p_gameId int)
+	UPDATE DixitGameCard
+	SET SortKey = RAND()
+	WHERE IsPicked
+	AND GameId IN (
+		SELECT Id FROM DixitGame WHERE Id = p_gameId AND MgrUserId IN (
+			SELECT Id FROM DixitUser WHERE UserName = p_userName AND HashedPassword = p_hashedPassword
+		)
+	);
 
-#INSERT INTO DixitVote (GameId, CardId, UserId) VALUES (1, 21, 4), (1, 22, 5), (1, 31, 3);
+#GRANT EXECUTE ON PROCEDURE DixitShuffleVotingCards TO 'dixit';
+
+-- Start the voting phase
+-- TODO: allow ST to run this
+DROP PROCEDURE IF EXISTS DixitStartVoting;
+CREATE PROCEDURE DixitStartVoting(p_userName varchar(100), p_hashedPassword varchar(64), p_gameId int)
+	UPDATE DixitGame
+	SET Status = 3
+	WHERE Status = 2
+	AND MgrUserId IN (SELECT Id FROM DixitUser WHERE UserName = p_userName AND HashedPassword = p_hashedPassword);
+
+#GRANT EXECUTE ON PROCEDURE DixitStartVoting TO 'dixit';
+
+-- Let manager stop the game (table DixitGame)
+-- Note: in PHP, after calling this SP, $mysqli->affected_rows is 1 (success) or 0
+DROP PROCEDURE IF EXISTS DixitStopGame;
+CREATE PROCEDURE DixitStopGame(p_userName varchar(100), p_hashedPassword varchar(64), p_gameId int)
+	UPDATE DixitGame
+	SET Status = 0, StUserId = NULL
+	WHERE MgrUserId IN (SELECT Id FROM DixitUser WHERE UserName = p_userName AND HashedPassword = p_hashedPassword);
+
+#GRANT EXECUTE ON PROCEDURE DixitStopGame TO 'dixit';
+
+-- Let manager stop the game (table DixitGameCard)
+-- Note: in PHP, after calling this SP, $mysqli->affected_rows is 84 (success) or 0
+DROP PROCEDURE IF EXISTS DixitResetDeck;
+CREATE PROCEDURE DixitResetDeck(p_userName varchar(100), p_hashedPassword varchar(64), p_gameId int)
+	UPDATE DixitGameCard
+	SET SortKey = RAND(), UserId = 0, IsPicked = false
+	WHERE GameId IN (
+		SELECT Id FROM DixitGame WHERE Id = p_gameId AND MgrUserId IN (
+			SELECT Id FROM DixitUser WHERE UserName = p_userName AND HashedPassword = p_hashedPassword
+		)
+	);
+
+#GRANT EXECUTE ON PROCEDURE DixitResetDeck TO 'dixit';
+
+-- Let manager stop the game (table DixitPlayer)
+-- Note: in PHP, after calling this SP, $mysqli->affected_rows is 4 (success) or 0
+DROP PROCEDURE IF EXISTS DixitResetVotes;
+CREATE PROCEDURE DixitResetVotes(p_userName varchar(100), p_hashedPassword varchar(64), p_gameId int)
+	UPDATE DixitPlayer
+	SET SortKey = RAND(), VoteCardId = 0
+	WHERE GameId IN (
+		SELECT Id FROM DixitGame WHERE Id = p_gameId AND MgrUserId IN (
+			SELECT Id FROM DixitUser WHERE UserName = p_userName AND HashedPassword = p_hashedPassword
+		)
+	);
+
+#GRANT EXECUTE ON PROCEDURE DixitResetVotes TO 'dixit';
+
+CALL DixitCreateGame('ruud', '10420dde4669ae7c675eaccc72bd4814cab0ad6b823cc384d8ce9b574bcf574e', 'HCC demo 29 augustus');
+CALL DixitCreateDeck(1);
+CALL DixitAddPlayer('ruud', '10420dde4669ae7c675eaccc72bd4814cab0ad6b823cc384d8ce9b574bcf574e', 1, 3);
+CALL DixitAddPlayer('ruud', '10420dde4669ae7c675eaccc72bd4814cab0ad6b823cc384d8ce9b574bcf574e', 1, 4);
+CALL DixitAddPlayer('ruud', '10420dde4669ae7c675eaccc72bd4814cab0ad6b823cc384d8ce9b574bcf574e', 1, 6);
+CALL DixitAddPlayer('ruud', '10420dde4669ae7c675eaccc72bd4814cab0ad6b823cc384d8ce9b574bcf574e', 1, 7);

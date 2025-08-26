@@ -60,6 +60,9 @@ if ($game->Players !== null) {
 		}
 	}
 }
+if ($game->VotingCards !== null) {
+	usort($game->VotingCards, fn($a, $b) => $a->SortKey <=> $b->SortKey);
+}
 $json = json_encode($game, JSON_PRETTY_PRINT);
 // ---------------------------------------------------------------------------
 // Output JSON

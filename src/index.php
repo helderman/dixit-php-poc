@@ -79,7 +79,8 @@ if ($gameId === false || $gameId === null) {
 <meta charset="utf-8" />
 <title>Dixit</title>
 <link rel="stylesheet" href="dixit.css" />
-<h1>Dixit - Lobby</h1>
+<div class="user"><?= htmlspecialchars($user->FullName) ?></div>
+<h1>Dixit &ndash; Lobby</h1>
 <h2>Kies een spel</h2>
 <ul>
 <?php
@@ -110,9 +111,9 @@ Bevestig je keuzes:
 	exit();
 }
 // ---------------------------------------------------------------------------
-// Game name
+// Game name and manager
 // ---------------------------------------------------------------------------
-$stmt = $mysqli->prepare("SELECT Name FROM DixitGame WHERE Id = ?");
+$stmt = $mysqli->prepare("SELECT Name, MgrUserId FROM DixitGame WHERE Id = ?");
 $stmt->bind_param("i", $gameId);
 $stmt->execute();
 $result = $stmt->get_result();
@@ -126,8 +127,23 @@ if (!$game) {
 <meta charset="utf-8" />
 <title>Dixit</title>
 <link rel="stylesheet" href="dixit.css" />
-<h1>Dixit - <?= htmlspecialchars($game->Name) ?> - <?= htmlspecialchars($user->FullName) ?></h1>
+<div class="user"><?= htmlspecialchars($user->FullName) ?></div>
+<h1><a href=".">Dixit</a> &ndash; <?= htmlspecialchars($game->Name) ?></h1>
 <p id="story"></p>
+<p>
+<?php
+if ($user->Id == $game->MgrUserId) {
+?>
+<button id="start" onclick="start(<?= $gameId ?>)">Start het spel</button>
+<button id="stop" onclick="stop(<?= $gameId ?>)">Stop het spel</button>
+<?php
+}
+?>
+<button id="vote" onclick="vote(<?= $gameId ?>)">Start het stemmen</button>
+<button id="show" onclick="show(<?= $gameId ?>)">Naar de uitslag</button>
+<button id="next" onclick="next(<?= $gameId ?>)">Start de volgende beurt</button>
+</p>
+<p>Je bent de verteller, doe je uitspraak: <input id="edit" maxlength="255"><button onclick="post(<?= $gameId ?>)">Bevestig</button></p>
 <div id="players"></div>
 <script src="index.js"></script>
 <script>poll(<?= $gameId ?>);</script>
