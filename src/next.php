@@ -23,7 +23,7 @@ $pwd_hash = hash('sha256', $_SERVER['PHP_AUTH_PW'] ?? 'gast');
 // Call start procedures
 // ---------------------------------------------------------------------------
 $mysqli->execute_query('CALL DixitRotatePlayers(?, ?, ?);', [$username, $pwd_hash, $gameId]);
-if ($mysqli->affected_rows != 1) {
+if ($mysqli->affected_rows != 4) {
 	http_response_code(403);
 	exit();
 }

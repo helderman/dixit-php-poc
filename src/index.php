@@ -139,7 +139,7 @@ if ($user->Id == $game->MgrUserId) {
 <?php
 }
 ?>
-<button id="vote" onclick="vote(<?= $gameId ?>)">Start het stemmen</button>
+<button id="voting" onclick="voting(<?= $gameId ?>)">Start het stemmen</button>
 <button id="show" onclick="show(<?= $gameId ?>)">Naar de uitslag</button>
 <button id="next" onclick="next(<?= $gameId ?>)">Start de volgende beurt</button>
 </p>

@@ -11,14 +11,17 @@ async function poll(gameId) {
 			switch (game.Status) {
 				case 3:
 				case 4:
-					html += '<div class="voting">';
+					const me = game.Players.filter(p => p.IsMe);
+					const myVote = me.length > 0 ? me[0].Vote : 0;
+					html += '<div class="voting"><h2>Stemmen: ' + game.Players.filter(p => p.Vote !== 0).length + '</h2>';
 					for (const card of game.VotingCards) {
 						html += '<img ' +
+							(card.Id == myVote ? 'class="voted"' : game.Status > 3 || game.IAmSt ? 'class=""' : 'onclick="vote(this, ' + gameId + ', ' + card.Id + ')"') +
 							' src="img/card' +
 							String(card.Id ?? '0').padStart(2, '0') +
 							'.jpg">\n';
 					}
-					html += '</div>\n';
+					html += '</div>';
 					break;
 				default:
 					for (const player of game.Players) {
@@ -46,7 +49,7 @@ async function poll(gameId) {
 			}
 			Display('start', game.Status == 0 && game.Players.length == 4);
 			Display('stop', game.Status > 0);
-			Display('vote', game.Status == 2 && (game.IAmMgr || game.IAmSt));
+			Display('voting', game.Status == 2 && (game.IAmMgr || game.IAmSt));
 			Display('show', game.Status == 3 && (game.IAmMgr || game.IAmSt));
 			Display('next', game.Status == 4 && (game.IAmMgr || game.IAmSt));
 			document.getElementById('edit').parentNode.style.display =
@@ -69,8 +72,12 @@ async function stop(gameId) {
 	}
 }
 
-async function vote(gameId) {
-	await fetch('vote.php?game=' + encodeURIComponent(gameId));
+async function voting(gameId) {
+	await fetch('voting.php?game=' + encodeURIComponent(gameId));
+}
+
+async function show(gameId) {
+	await fetch('show.php?game=' + encodeURIComponent(gameId));
 }
 
 async function next(gameId) {
@@ -86,6 +93,13 @@ async function pick(img, gameId, cardId) {
 	if (!img.classList.contains('picked')) {
 		img.classList.add('picked');
 		await fetch('pick.php?game=' + encodeURIComponent(gameId) + '&card=' + encodeURIComponent(cardId));
+	}
+}
+
+async function vote(img, gameId, cardId) {
+	if (!img.classList.contains('voted')) {
+		img.classList.add('voted');
+		await fetch('vote.php?game=' + encodeURIComponent(gameId) + '&card=' + encodeURIComponent(cardId));
 	}
 }
 
