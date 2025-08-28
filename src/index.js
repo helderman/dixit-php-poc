@@ -6,22 +6,42 @@ async function poll(gameId) {
 		draw = 0;
 		if (response.ok) {
 			const game = await response.json();
-			document.getElementById('story').innerHTML = GetStory(game);
+			document.getElementById('story').innerHTML = DescribeStatus(game);
 			let html = '';
 			switch (game.Status) {
 				case 3:
 				case 4:
 					const me = game.Players.filter(p => p.IsMe);
 					const myVote = me.length > 0 ? me[0].Vote : 0;
-					html += '<div class="voting"><h2>Stemmen: ' + game.Players.filter(p => p.Vote !== 0).length + '</h2>';
+					const ppp = game.Players.filter(p => !p.IsSt);
+					const all = ppp.filter(p => p.Vote !== ppp[0].Vote).length == 0;
+					const stPicks = game.VotingCards.filter(c => c.StPick);
+					html += '<h2>Stemmen: ' + game.Players.filter(p => p.Vote !== 0).length + '</h2>';
 					for (const card of game.VotingCards) {
-						html += '<img ' +
+						const pickers = game.Players.filter(p => p.Id == card.UserId);
+						const pickerName = pickers.length > 0 ? pickers[0].FullName : "?";
+						html += '<div class="player"><img ' +
 							(card.Id == myVote ? 'class="voted"' : game.Status > 3 || game.IAmSt ? 'class=""' : 'onclick="vote(this, ' + gameId + ', ' + card.Id + ')"') +
 							' src="img/card' +
 							String(card.Id ?? '0').padStart(2, '0') +
-							'.jpg">\n';
+							'.jpg"><h2>' + HtmlEncode(pickerName) + '</h2>';
+						if (game.Status > 3) {
+							const voters = game.Players.filter(p => p.Vote == card.Id);
+							html += '<p>Kreeg stemmen van: ' +
+								(voters.length > 0 ? HtmlEncode(voters.map(p => p.FullName).join(', ')) : '<i>niemand</i>') +
+								'</p><p>';
+							if (card.StPick) {
+								html += 'Verteller krijgt ' + (voters.length > 0 && voters.length < 3 ? 3 : 0) + ' punten';
+							}
+							else {
+								html += 'Aantal punten: ' +
+									(pickers[0].Vote !== stPicks[0].Id ? 0 : all ? 2 : 3) +
+									' + ' + voters.length;
+							}
+							html += '</p>';
+						}
+						html += '</div>\n';
 					}
-					html += '</div>';
 					break;
 				default:
 					for (const player of game.Players) {
@@ -32,7 +52,8 @@ async function poll(gameId) {
 						html += '<div class="player"><h2';
 						if (player.IsMe) html += ' class="me"';
 						html += '>' + HtmlEncode(player.FullName) +
-							'</h2>\n<p>Score: ' + player.Score + '</p>\n<div>\n';
+							'</h2>\n<div>\n';
+							//'</h2>\n<p>Score: ' + player.Score + '</p>\n<div>\n';
 						for (const card of cards) {
 							html += '<img ' +
 								(card.IsPicked ? 'class="picked"' : 'onclick="pick(this, ' + gameId + ', ' + card.Id + ')"') +
@@ -67,9 +88,13 @@ async function start(gameId) {
 }
 
 async function stop(gameId) {
-	if (confirm('Weet je zeker dat je het spel wilt afbreken?')) {
+	if (confirm('Weet je zeker dat je deze speeltafel wilt afruimen?')) {
 		await fetch('stop.php?game=' + encodeURIComponent(gameId));
 	}
+}
+
+async function reshuffle(gameId) {
+	await fetch('reshuffle.php?game=' + encodeURIComponent(gameId));
 }
 
 async function voting(gameId) {
@@ -103,14 +128,21 @@ async function vote(img, gameId, cardId) {
 	}
 }
 
-function GetStory(game) {
+function DescribeStatus(game) {
+	const story = 'De verteller heeft een kaart gekozen en doet daarbij de uitspraak: <i>' + HtmlEncode(game.Story ?? '') + '</i><br>';
 	switch (game.Status) {
-		case 0:
-			return 'Zodra er 4 spelers zijn, kan de beheerder het spel starten.';
-		case 1:
-			return 'Het wachten is op de verteller om een kaart te kiezen en daarbij een uitspraak te doen...';
+		case 0:	// join
+			return 'Zodra er 4 spelers zijn, dan kan de beheerder het spel starten.';
+		case 1: // story
+			return 'Het wachten is op de verteller om een kaart te kiezen en daarbij een uitspraak te doen.';
+		case 2:	// pick
+			return story + 'De andere spelers kiezen uit hun hand een kaart die past bij deze uitspraak.';
+		case 3:	// vote
+			return story + 'De andere spelers stemmen welke kaart volgens hen van de verteller is.';
+		case 4:	// showdown
+			return story + 'De beurt is voorbij. Alle spelers zien hieronder hoeveel punten ze gescoord hebben.';
 		default:
-			return 'De verteller heeft een kaart gekozen en geeft als uitspraak: <b>' + HtmlEncode(game.Story) + '</b>';
+			return 'Status = ' + game.Status;
 	}
 }
 
@@ -120,5 +152,5 @@ function HtmlEncode(s) {
 
 function Display(id, condition) {
 	const elem = document.getElementById(id);
-	if (elem) elem.style.display = condition ? 'block' : 'none';
+	if (elem) elem.style.display = condition ? 'initial' : 'none';
 }

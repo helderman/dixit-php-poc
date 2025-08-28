@@ -136,7 +136,7 @@ CREATE PROCEDURE DixitJson(p_gameId int, p_userId int)
 					WHERE c.GameId = p.GameId
 					AND c.UserId = p.UserId
 				),
-				'Vote', CASE WHEN p.UserId = p_userId OR p.VoteCardId = 0 THEN p.VoteCardId END
+				'Vote', CASE WHEN g.Status > 3 OR p.VoteCardId = 0 OR p.UserId = p_userId THEN p.VoteCardId END
 			))
 			FROM DixitPlayer p
 			INNER JOIN DixitUser u ON u.Id = p.UserId
@@ -145,6 +145,7 @@ CREATE PROCEDURE DixitJson(p_gameId int, p_userId int)
 		'VotingCards', (
 			SELECT JSON_ARRAYAGG(JSON_OBJECT(
 				'Id', c.CardId,
+				'UserId', CASE WHEN g.Status > 3 OR c.UserId = p_userId THEN c.UserId END,
 				'StPick', g.Status > 3 AND c.UserId = g.StUserId,
 				'SortKey', c.SortKey
 			))
@@ -254,25 +255,29 @@ CREATE PROCEDURE DixitDiscard(p_gameId int)
 
 -- Move 'discard pile' (if any) onto 'draw pile', and shuffle the pile.
 DROP PROCEDURE IF EXISTS DixitShuffleDrawPile;
-CREATE PROCEDURE DixitShuffleDrawPile(p_gameId int)
+CREATE PROCEDURE DixitShuffleDrawPile(p_userName varchar(100), p_hashedPassword varchar(64), p_gameId int)
 	UPDATE DixitGameCard
 	SET SortKey = RAND(), UserId = 0
-	WHERE GameId = p_gameId
-	AND UserId <= 0;
+	WHERE UserId <= 0
+	AND GameId IN (
+		SELECT Id FROM DixitGame WHERE Id = p_gameId AND MgrUserId IN (
+			SELECT Id FROM DixitUser WHERE UserName = p_userName AND HashedPassword = p_hashedPassword
+		)
+	);
 
 #GRANT EXECUTE ON PROCEDURE DixitShuffleDrawPile TO 'dixit';
 
 -- Rotate the players so that the next one will become first in line; reset votes.
--- TODO: allow ST to run this
 DROP PROCEDURE IF EXISTS DixitRotatePlayers;
 CREATE PROCEDURE DixitRotatePlayers(p_userName varchar(100), p_hashedPassword varchar(64), p_gameId int)
 	UPDATE DixitPlayer
 	SET SortKey = SortKey + 1.0, VoteCardId = 0
 	WHERE UserId IN (SELECT StUserId FROM DixitGame WHERE Id = p_gameId)
 	AND GameId IN (
-		SELECT Id FROM DixitGame WHERE Id = p_gameId AND MgrUserId IN (
-			SELECT Id FROM DixitUser WHERE UserName = p_userName AND HashedPassword = p_hashedPassword
-		)
+		SELECT *
+		FROM DixitGame
+		WHERE Id = p_gameId
+		AND EXISTS (SELECT * FROM DixitUser WHERE Id IN (StUserId, MgrUserId) AND UserName = p_userName AND HashedPassword = p_hashedPassword)
 	);
 
 #GRANT EXECUTE ON PROCEDURE DixitRotatePlayers TO 'dixit';
@@ -288,7 +293,7 @@ CREATE PROCEDURE DixitStartTurn(p_userName varchar(100), p_hashedPassword varcha
 	WHERE Id = p_gameId
 	AND Status IN (0, 4)
 	AND 4 = (SELECT COUNT(*) FROM DixitPlayer WHERE GameId = p_gameId)
-	AND COALESCE(StUserId, MgrUserId) IN (SELECT Id FROM DixitUser WHERE UserName = p_userName AND HashedPassword = p_hashedPassword);
+	AND EXISTS (SELECT * FROM DixitUser WHERE Id IN (StUserId, MgrUserId) AND UserName = p_userName AND HashedPassword = p_hashedPassword);
 
 #GRANT EXECUTE ON PROCEDURE DixitStartTurn TO 'dixit';
 
@@ -391,7 +396,7 @@ CREATE PROCEDURE DixitResetDeck(p_userName varchar(100), p_hashedPassword varcha
 DROP PROCEDURE IF EXISTS DixitResetVotes;
 CREATE PROCEDURE DixitResetVotes(p_userName varchar(100), p_hashedPassword varchar(64), p_gameId int)
 	UPDATE DixitPlayer
-	SET SortKey = RAND(), VoteCardId = 0
+	SET SortKey = RAND(), Score = 0, VoteCardId = 0
 	WHERE GameId IN (
 		SELECT Id FROM DixitGame WHERE Id = p_gameId AND MgrUserId IN (
 			SELECT Id FROM DixitUser WHERE UserName = p_userName AND HashedPassword = p_hashedPassword

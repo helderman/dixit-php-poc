@@ -13,6 +13,10 @@ h1 {
 	float: right;
 }
 
+.user > a {
+	color: #bff;
+}
+
 #edit {
 	width: 50%;
 }
@@ -20,6 +24,10 @@ h1 {
 #players {
 	display: flex;
 	flex-wrap: wrap;
+}
+
+#players > h2 {
+	text-align: center;
 }
 
 .player {
@@ -58,7 +66,6 @@ h1 {
 }
 
 .voting {
-	text-align: center;
 }
 
 .voting > img {

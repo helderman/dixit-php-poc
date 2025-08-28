@@ -27,9 +27,9 @@ if (!$user) {
 <meta charset="utf-8" />
 <title>Dixit</title>
 <link rel="stylesheet" href="dixit.css" />
+<div class="user"><a href=".">inloggen</a></div>
 <h1>Dixit</h1>
 <p>
-Graag <a href=".">inloggen</a>.
 Toeschouwers kunnen inloggen met gebruikersnaam gast, wachtwoord gast.
 </p>
 <?php
@@ -81,7 +81,7 @@ if ($gameId === false || $gameId === null) {
 <link rel="stylesheet" href="dixit.css" />
 <div class="user"><?= htmlspecialchars($user->FullName) ?></div>
 <h1>Dixit &ndash; Lobby</h1>
-<h2>Kies een spel</h2>
+<h2>Spelers en toeschouwers, kies hier een speeltafel</h2>
 <ul>
 <?php
 $stmt = $mysqli->prepare("SELECT Id, Name FROM DixitGame ORDER BY Id");
@@ -92,14 +92,14 @@ while ($stmt->fetch()) {
 }
 ?>
 </ul>
-<h2>Begin een nieuw spel</h2>
+<h2>Beheerders, maak hier een nieuwe speeltafel aan</h2>
 <form action="?action=newgame" method="post">
 <p>
-Geef het spel een naam:
-<input type="text" name="name" required><br>
+Geef de speeltafel een naam:
+<input type="text" name="name" size="100" required><br>
 </p>
 <p>
-Direct jezelf toevoegen als speler:
+Direct jezelf toevoegen als speler aan deze speeltafel:
 <input type="checkbox" name="join" checked><br>
 </p>
 <p>
@@ -136,6 +136,7 @@ if ($user->Id == $game->MgrUserId) {
 ?>
 <button id="start" onclick="start(<?= $gameId ?>)">Start het spel</button>
 <button id="stop" onclick="stop(<?= $gameId ?>)">Stop het spel</button>
+<button id="reshuffle" onclick="reshuffle(<?= $gameId ?>)">Stapel schudden</button>
 <?php
 }
 ?>
@@ -143,7 +144,10 @@ if ($user->Id == $game->MgrUserId) {
 <button id="show" onclick="show(<?= $gameId ?>)">Naar de uitslag</button>
 <button id="next" onclick="next(<?= $gameId ?>)">Start de volgende beurt</button>
 </p>
-<p>Je bent de verteller, doe je uitspraak: <input id="edit" maxlength="255"><button onclick="post(<?= $gameId ?>)">Bevestig</button></p>
+<p style="display:none">
+Je bent de verteller, kies een kaart en doe je uitspraak:
+<input id="edit" maxlength="255"><button onclick="post(<?= $gameId ?>)">Bevestig</button>
+</p>
 <div id="players"></div>
 <script src="index.js"></script>
 <script>poll(<?= $gameId ?>);</script>

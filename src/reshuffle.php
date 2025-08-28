@@ -20,18 +20,9 @@ $mysqli->query("SET ROLE 'dixit';");
 $username = $_SERVER['PHP_AUTH_USER'] ?? 'gast';
 $pwd_hash = hash('sha256', $_SERVER['PHP_AUTH_PW'] ?? 'gast');
 // ---------------------------------------------------------------------------
-// Call start procedures
+// Call stored procedure
 // ---------------------------------------------------------------------------
-$mysqli->execute_query('CALL DixitRotatePlayers(?, ?, ?);', [$username, $pwd_hash, $gameId]);
-if ($mysqli->affected_rows != 1) {
-	http_response_code(403);
-	exit();
-}
-$mysqli->execute_query('CALL DixitStartTurn(?, ?, ?);', [$username, $pwd_hash, $gameId]);
-if ($mysqli->affected_rows != 1) {
-	http_response_code(403);
-	exit();
-}
+$mysqli->execute_query('CALL DixitShuffleDrawPile(?, ?, ?);', [$username, $pwd_hash, $gameId]);
 $json = json_encode($gameId, JSON_PRETTY_PRINT);
 // ---------------------------------------------------------------------------
 // Output JSON
