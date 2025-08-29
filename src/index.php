@@ -5,7 +5,7 @@
 require('../../dbconn.php');
 $mysqli = new mysqli($sSqlSrv, $sSqlUid, $sSqlPwd, $sSqlDb);
 $mysqli->set_charset('utf8mb4');
-$mysqli->query("SET ROLE 'dixit';");
+if (isset($setRole)) $mysqli->query("SET ROLE 'dixit';");
 // ---------------------------------------------------------------------------
 // Log in
 // ---------------------------------------------------------------------------
@@ -48,17 +48,24 @@ if ($action) {
 	case 'newgame':
 		$gameName = filter_input(INPUT_POST, 'name');
 		if ($gameName) {
-			$stmt = $mysqli->prepare("CALL DixitCreateGame(?, ?, ?)");
-			$stmt->bind_param("sss", $username, $pwd_hash, $gameName);
-			$stmt->execute();
+			// https://stackoverflow.com/questions/62779749/how-to-get-lastinsertid-when-executing-a-stored-procedure-on-a-mysql-server-in-p
+			//$mysqli->execute_query('CALL DixitCreateGame(?, ?, ?);', [$username, $pwd_hash, $gameName]);
+			$mysqli->execute_query('INSERT INTO DixitGame (Name, MgrUserId) VALUES (?, ?);', [$gameName, $user->Id]);
+			//$stmt = $mysqli->prepare("CALL DixitCreateGame(?, ?, ?)");
+			//$stmt->bind_param("sss", $username, $pwd_hash, $gameName);
+			//$stmt->execute();
 			$gameId = $mysqli->insert_id;
-			$stmt = $mysqli->prepare("CALL DixitCreateDeck(?)");
-			$stmt->bind_param("i", $gameId);
-			$stmt->execute();
-			if (isset($_POST['join'])) {
-				$stmt = $mysqli->prepare("CALL DixitJoinGame(?, ?, ?)");
-				$stmt->bind_param("ssi", $username, $pwd_hash, $gameId);
-				$stmt->execute();
+
+			$mysqli->execute_query('CALL DixitCreateDeck(?);', [$gameId]);
+			//$stmt = $mysqli->prepare("CALL DixitCreateDeck(?)");
+			//$stmt->bind_param("i", $gameId);
+			//$stmt->execute();
+
+			if ($_POST['join'] == "yes") {
+				$mysqli->execute_query('CALL DixitJoinGame(?, ?, ?);', [$username, $pwd_hash, $gameId]);
+				//$stmt = $mysqli->prepare("CALL DixitJoinGame(?, ?, ?)");
+				//$stmt->bind_param("ssi", $username, $pwd_hash, $gameId);
+				//$stmt->execute();
 			}
 		}
 		break;
@@ -81,6 +88,9 @@ if ($gameId === false || $gameId === null) {
 <link rel="stylesheet" href="dixit.css" />
 <div class="user"><?= htmlspecialchars($user->FullName) ?></div>
 <h1>Dixit &ndash; Lobby</h1>
+<h2>Spelregels</h2>
+<a href="https://www.bordspellenstore.nl/wp-content/uploads/2018/01/Spelregels-Dixit.pdf" target="_blank">PDF</a>
+(opent in apart tabblad)
 <h2>Spelers en toeschouwers, kies hier een speeltafel</h2>
 <ul>
 <?php
@@ -92,19 +102,23 @@ while ($stmt->fetch()) {
 }
 ?>
 </ul>
+<p><button onclick="window.location='.'">Lijst verversen</button></p>
 <h2>Beheerders, maak hier een nieuwe speeltafel aan</h2>
 <form action="?action=newgame" method="post">
 <p>
 Geef de speeltafel een naam:
-<input type="text" name="name" size="100" required><br>
+<input type="text" name="name" size="100" required>
 </p>
 <p>
 Direct jezelf toevoegen als speler aan deze speeltafel:
-<input type="checkbox" name="join" checked><br>
+<select name="join">
+<option value="yes">Ja, ik speel zelf mee aan deze tafel</option>
+<option value="no">Nee, ik kijk alleen mee aan deze tafel</option>
+</select>
 </p>
 <p>
 Bevestig je keuzes:
-<input type="submit" value="OK">
+<button>OK, tafel aanmaken</button>
 </p>
 </form>
 <?php
@@ -137,6 +151,12 @@ if ($user->Id == $game->MgrUserId) {
 <button id="start" onclick="start(<?= $gameId ?>)">Start het spel</button>
 <button id="stop" onclick="stop(<?= $gameId ?>)">Stop het spel</button>
 <button id="reshuffle" onclick="reshuffle(<?= $gameId ?>)">Stapel schudden</button>
+<?php
+}
+if ($user->Id > 1) {
+?>
+<button id="join" onclick="join(<?= $gameId ?>)">Meedoen</button>
+<button id="leave" onclick="leave(<?= $gameId ?>)">Niet meedoen</button>
 <?php
 }
 ?>

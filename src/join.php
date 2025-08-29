@@ -22,7 +22,7 @@ $pwd_hash = hash('sha256', $_SERVER['PHP_AUTH_PW'] ?? 'gast');
 // ---------------------------------------------------------------------------
 // Call stored procedure
 // ---------------------------------------------------------------------------
-$mysqli->execute_query('CALL DixitStartShowdown(?, ?, ?);', [$username, $pwd_hash, $gameId]);
+$mysqli->execute_query('CALL DixitJoinGame(?, ?, ?);', [$username, $pwd_hash, $gameId]);
 if ($mysqli->affected_rows != 1) {
 	http_response_code(403);
 	exit();

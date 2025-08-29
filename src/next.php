@@ -13,7 +13,7 @@ if ($gameId === false || $gameId === null) {
 require('../../dbconn.php');
 $mysqli = new mysqli($sSqlSrv, $sSqlUid, $sSqlPwd, $sSqlDb);
 $mysqli->set_charset('utf8mb4');
-$mysqli->query("SET ROLE 'dixit';");
+if (isset($setRole)) $mysqli->query("SET ROLE 'dixit';");
 // ---------------------------------------------------------------------------
 // Get credentials from PHP session
 // ---------------------------------------------------------------------------
@@ -24,6 +24,11 @@ $pwd_hash = hash('sha256', $_SERVER['PHP_AUTH_PW'] ?? 'gast');
 // ---------------------------------------------------------------------------
 $mysqli->execute_query('CALL DixitRotatePlayers(?, ?, ?);', [$username, $pwd_hash, $gameId]);
 if ($mysqli->affected_rows != 1) {
+	http_response_code(403);
+	exit();
+}
+$mysqli->execute_query('CALL DixitDiscard(?);', [$gameId]);
+if ($mysqli->affected_rows != 4) {
 	http_response_code(403);
 	exit();
 }

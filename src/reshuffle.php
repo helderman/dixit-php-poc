@@ -13,7 +13,7 @@ if ($gameId === false || $gameId === null) {
 require('../../dbconn.php');
 $mysqli = new mysqli($sSqlSrv, $sSqlUid, $sSqlPwd, $sSqlDb);
 $mysqli->set_charset('utf8mb4');
-$mysqli->query("SET ROLE 'dixit';");
+if (isset($setRole)) $mysqli->query("SET ROLE 'dixit';");
 // ---------------------------------------------------------------------------
 // Get credentials from PHP session
 // ---------------------------------------------------------------------------

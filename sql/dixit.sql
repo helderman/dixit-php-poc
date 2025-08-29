@@ -13,14 +13,16 @@ DROP TABLE IF EXISTS DixitCard;
 CREATE TABLE DixitCard (
 	Id int NOT NULL AUTO_INCREMENT PRIMARY KEY
 );
-INSERT INTO DixitCard () VALUES   -- numbers 1-84
-	(), (), (), (), (), (), (), (), (), (), (), (),
-	(), (), (), (), (), (), (), (), (), (), (), (),
-	(), (), (), (), (), (), (), (), (), (), (), (),
-	(), (), (), (), (), (), (), (), (), (), (), (),
-	(), (), (), (), (), (), (), (), (), (), (), (),
-	(), (), (), (), (), (), (), (), (), (), (), (),
-	(), (), (), (), (), (), (), (), (), (), (), ();
+-- I found out the hard way that having Copilot generate a list of numbers
+-- is more reliable than trusting your DBA to leave MySQL's auto-increment-increment on 1
+INSERT INTO DixitCard (Id) VALUES   -- numbers 1-84
+	(1), (2), (3), (4), (5), (6), (7), (8), (9), (10), (11), (12),
+	(13), (14), (15), (16), (17), (18), (19), (20), (21), (22), (23), (24),
+	(25), (26), (27), (28), (29), (30), (31), (32), (33), (34), (35), (36),
+	(37), (38), (39), (40), (41), (42), (43), (44), (45), (46), (47), (48),
+	(49), (50), (51), (52), (53), (54), (55), (56), (57), (58), (59), (60),
+	(61), (62), (63), (64), (65), (66), (67), (68), (69), (70), (71), (72),
+	(73), (74), (75), (76), (77), (78), (79), (80), (81), (82), (83), (84);
 
 DROP TABLE IF EXISTS DixitUser;
 CREATE TABLE DixitUser (
@@ -34,17 +36,17 @@ CREATE TABLE DixitUser (
 
 #GRANT SELECT ON DixitUser TO 'dixit';
 
-INSERT INTO DixitUser (UserName, HashedPassword, FullName) VALUES
-	('gast', 'aaac7fafa76910e7a042ae9f783c08cc516ea835ee3cffb7055421a25be67a21', 'Gast'),
-	('kees', 'a51c75213f877072d747efd372e729a8c348af908b12140aec373bee0c3032a7', 'Kees'),
-	('john', 'b0b4df86a1580b5f33f2b436c83219b0d7efd32209747fbb2883b70855d7c21b', 'John'),
-	('marco', '39ca1d9c2ea67847fe6adb6f7ff73560323a56ac182607f13adf4583a5ef00f9', 'Marco'),
-	('marja', 'b7f750c2c0a45ce9965691c8c8609184c8db4454b5deab9d8de5161ebdd786d0', 'Marja'),
-	('paul', '363eb4ba561085d02bd4e6c07aa9847c762e97409fbd8876ddd192c38b66d9a0', 'Paul'),
-	('rene', '6fcf8bf65219de08e0fce65a7cdda568c1fdc04286551ca264fd13bcd8331955', 'Rene'),
-	('ruud', '10420dde4669ae7c675eaccc72bd4814cab0ad6b823cc384d8ce9b574bcf574e', 'Ruud'),
-	('winfried', 'e3cf9835a6308421367bd4945127c8acd4594b2dda941b520c0fdc104179140d', 'Winfried'),
-	('wim', 'f4c62aeb63302d6b1dbd9864dbd36acd1182bed76585cb3b8eff506f85bc7e14', 'Wim');
+INSERT INTO DixitUser (Id, UserName, HashedPassword, FullName) VALUES
+	(1, 'gast', 'aaac7fafa76910e7a042ae9f783c08cc516ea835ee3cffb7055421a25be67a21', 'Gast'),
+	(2, 'kees', 'a51c75213f877072d747efd372e729a8c348af908b12140aec373bee0c3032a7', 'Kees'),
+	(3, 'john', 'b0b4df86a1580b5f33f2b436c83219b0d7efd32209747fbb2883b70855d7c21b', 'John'),
+	(4, 'marco', '39ca1d9c2ea67847fe6adb6f7ff73560323a56ac182607f13adf4583a5ef00f9', 'Marco'),
+	(5, 'marja', 'b7f750c2c0a45ce9965691c8c8609184c8db4454b5deab9d8de5161ebdd786d0', 'Marja'),
+	(6, 'paul', '363eb4ba561085d02bd4e6c07aa9847c762e97409fbd8876ddd192c38b66d9a0', 'Paul'),
+	(7, 'rene', '6fcf8bf65219de08e0fce65a7cdda568c1fdc04286551ca264fd13bcd8331955', 'Rene'),
+	(8, 'ruud', '10420dde4669ae7c675eaccc72bd4814cab0ad6b823cc384d8ce9b574bcf574e', 'Ruud'),
+	(9, 'winfried', 'e3cf9835a6308421367bd4945127c8acd4594b2dda941b520c0fdc104179140d', 'Winfried'),
+	(10, 'wim', 'f4c62aeb63302d6b1dbd9864dbd36acd1182bed76585cb3b8eff506f85bc7e14', 'Wim');
 
 DROP TABLE IF EXISTS DixitGame;
 CREATE TABLE DixitGame (
@@ -58,6 +60,7 @@ CREATE TABLE DixitGame (
 );
 
 #GRANT SELECT ON DixitGame TO 'dixit';
+#GRANT INSERT ON DixitGame TO 'dixit';	-- because DixitCreateGame does not work well
 
 DROP TABLE IF EXISTS DixitPlayer;
 CREATE TABLE DixitPlayer (
@@ -162,6 +165,7 @@ CREATE PROCEDURE DixitJson(p_gameId int, p_userId int)
 
 -- Create game
 -- Note: in PHP, after calling this SP, $mysqli->insert_id holds game's Id
+-- TODO: make insert_id work; see https://stackoverflow.com/questions/62779749/how-to-get-lastinsertid-when-executing-a-stored-procedure-on-a-mysql-server-in-p
 DROP PROCEDURE IF EXISTS DixitCreateGame;
 CREATE PROCEDURE DixitCreateGame(p_userName varchar(100), p_hashedPassword varchar(64), p_name varchar(100))
 	INSERT INTO DixitGame (Name, MgrUserId)
@@ -215,9 +219,12 @@ CREATE PROCEDURE DixitJoinGame(p_userName varchar(100), p_hashedPassword varchar
 	INSERT INTO DixitPlayer (GameId, UserId, SortKey)
 	SELECT p_gameId, Id, RAND()
 	FROM DixitUser
-	WHERE UserName = p_userName
+	WHERE Id > 1
+	AND UserName = p_userName
 	AND HashedPassword = p_hashedPassword
-	AND EXISTS (SELECT * FROM DixitGame WHERE Id = p_gameId AND Status = 0);
+	AND EXISTS (SELECT * FROM DixitGame WHERE Id = p_gameId AND Status = 0)
+	AND Id NOT IN (SELECT UserId FROM DixitPlayer WHERE GameId = p_gameId)
+	AND 4 > (SELECT COUNT(*) FROM DixitPlayer WHERE GameId = p_gameId);
 
 #GRANT EXECUTE ON PROCEDURE DixitJoinGame TO 'dixit';
 
@@ -227,7 +234,8 @@ DROP PROCEDURE IF EXISTS DixitLeaveGame;
 CREATE PROCEDURE DixitLeaveGame(p_userName varchar(100), p_hashedPassword varchar(64), p_gameId int)
 	DELETE FROM DixitPlayer
 	WHERE GameId = p_gameId
-	AND UserId IN (SELECT Id FROM DixitUser WHERE UserName = p_userName AND HashedPassword = p_hashedPassword);
+	AND UserId IN (SELECT Id FROM DixitUser WHERE UserName = p_userName AND HashedPassword = p_hashedPassword)
+	AND EXISTS (SELECT * FROM DixitGame WHERE Id = p_gameId AND Status = 0);
 
 #GRANT EXECUTE ON PROCEDURE DixitLeaveGame TO 'dixit';
 
@@ -274,7 +282,7 @@ CREATE PROCEDURE DixitRotatePlayers(p_userName varchar(100), p_hashedPassword va
 	SET SortKey = SortKey + 1.0, VoteCardId = 0
 	WHERE UserId IN (SELECT StUserId FROM DixitGame WHERE Id = p_gameId)
 	AND GameId IN (
-		SELECT *
+		SELECT Id
 		FROM DixitGame
 		WHERE Id = p_gameId
 		AND EXISTS (SELECT * FROM DixitUser WHERE Id IN (StUserId, MgrUserId) AND UserName = p_userName AND HashedPassword = p_hashedPassword)
@@ -404,10 +412,3 @@ CREATE PROCEDURE DixitResetVotes(p_userName varchar(100), p_hashedPassword varch
 	);
 
 #GRANT EXECUTE ON PROCEDURE DixitResetVotes TO 'dixit';
-
-CALL DixitCreateGame('ruud', '10420dde4669ae7c675eaccc72bd4814cab0ad6b823cc384d8ce9b574bcf574e', 'HCC demo 29 augustus');
-CALL DixitCreateDeck(1);
-CALL DixitAddPlayer('ruud', '10420dde4669ae7c675eaccc72bd4814cab0ad6b823cc384d8ce9b574bcf574e', 1, 4);
-CALL DixitAddPlayer('ruud', '10420dde4669ae7c675eaccc72bd4814cab0ad6b823cc384d8ce9b574bcf574e', 1, 5);
-CALL DixitAddPlayer('ruud', '10420dde4669ae7c675eaccc72bd4814cab0ad6b823cc384d8ce9b574bcf574e', 1, 7);
-CALL DixitAddPlayer('ruud', '10420dde4669ae7c675eaccc72bd4814cab0ad6b823cc384d8ce9b574bcf574e', 1, 8);

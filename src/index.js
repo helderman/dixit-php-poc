@@ -1,4 +1,5 @@
 async function poll(gameId) {
+	const status = document.getElementById('story');
 	const players = document.getElementById('players');
 	let draw = 0;
 	for (;;) {
@@ -6,45 +7,49 @@ async function poll(gameId) {
 		draw = 0;
 		if (response.ok) {
 			const game = await response.json();
-			document.getElementById('story').innerHTML = DescribeStatus(game);
-			let html = '';
+			let html = DescribeStatus(game);
+			if (status.innerHTML != html) {
+				//console.log('Old: ' + status.innerHTML + '\nNew: ' + html);
+				status.innerHTML = html;
+			}
+			const me = (game.Players ?? []).filter(p => p.IsMe);
+			html = '';
 			switch (game.Status) {
 				case 3:
 				case 4:
-					const me = game.Players.filter(p => p.IsMe);
 					const myVote = me.length > 0 ? me[0].Vote : 0;
 					const ppp = game.Players.filter(p => !p.IsSt);
 					const all = ppp.filter(p => p.Vote !== ppp[0].Vote).length == 0;
 					const stPicks = game.VotingCards.filter(c => c.StPick);
-					html += '<h2>Stemmen: ' + game.Players.filter(p => p.Vote !== 0).length + '</h2>';
 					for (const card of game.VotingCards) {
 						const pickers = game.Players.filter(p => p.Id == card.UserId);
 						const pickerName = pickers.length > 0 ? pickers[0].FullName : "?";
-						html += '<div class="player"><img ' +
+						html += '<div class="player"><h2>' + HtmlEncode(pickerName) + '</h2><img ' +
 							(card.Id == myVote ? 'class="voted"' : game.Status > 3 || game.IAmSt ? 'class=""' : 'onclick="vote(this, ' + gameId + ', ' + card.Id + ')"') +
 							' src="img/card' +
 							String(card.Id ?? '0').padStart(2, '0') +
-							'.jpg"><h2>' + HtmlEncode(pickerName) + '</h2>';
+							'.jpg">';
 						if (game.Status > 3) {
 							const voters = game.Players.filter(p => p.Vote == card.Id);
 							html += '<p>Kreeg stemmen van: ' +
 								(voters.length > 0 ? HtmlEncode(voters.map(p => p.FullName).join(', ')) : '<i>niemand</i>') +
-								'</p><p>';
+								'</p><p>' + HtmlEncode(pickerName);
 							if (card.StPick) {
-								html += 'Verteller krijgt ' + (voters.length > 0 && voters.length < 3 ? 3 : 0) + ' punten';
+								html += ' (verteller) krijgt ' + (voters.length > 0 && voters.length < 3 ? 3 : 0) + ' punten';
 							}
 							else {
-								html += 'Aantal punten: ' +
+								html += ' krijgt ' +
 									(pickers[0].Vote !== stPicks[0].Id ? 0 : all ? 2 : 3) +
-									' + ' + voters.length;
+									' + ' + voters.length + ' punten';
 							}
 							html += '</p>';
 						}
 						html += '</div>\n';
 					}
+					html += '<h2>Stemmen:<br>' + game.Players.filter(p => p.Vote !== 0).length + ' van 3</h2>';
 					break;
 				default:
-					for (const player of game.Players) {
+					for (const player of game.Players ?? []) {
 						const cards = player.Cards ?? [];
 						if (game.Status > 0 && player.IsMe) {
 							draw = 6 - cards.length;
@@ -68,8 +73,10 @@ async function poll(gameId) {
 				//console.log('Old: ' + players.innerHTML + '\nNew: ' + html);
 				players.innerHTML = html;
 			}
-			Display('start', game.Status == 0 && game.Players.length == 4);
+			Display('start', game.Status == 0 && game.Players && game.Players.length == 4);
 			Display('stop', game.Status > 0);
+			Display('join', game.Status <= 0 && me.length == 0);
+			Display('leave', game.Status <= 0 && me.length > 0);
 			Display('voting', game.Status == 2 && (game.IAmMgr || game.IAmSt));
 			Display('show', game.Status == 3 && (game.IAmMgr || game.IAmSt));
 			Display('next', game.Status == 4 && (game.IAmMgr || game.IAmSt));
@@ -95,6 +102,14 @@ async function stop(gameId) {
 
 async function reshuffle(gameId) {
 	await fetch('reshuffle.php?game=' + encodeURIComponent(gameId));
+}
+
+async function join(gameId) {
+	await fetch('join.php?game=' + encodeURIComponent(gameId));
+}
+
+async function leave(gameId) {
+	await fetch('leave.php?game=' + encodeURIComponent(gameId));
 }
 
 async function voting(gameId) {
